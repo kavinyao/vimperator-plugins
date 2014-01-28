@@ -17,13 +17,13 @@ Annotate selected text on current page.
     - builtin colors: yellow(y), green(g), blue(b), pink(p), purple(pp)
     - custom color: #fe88d5 (use hexadecimal with hashtag)
 
-# tco
+## tco
 
 Restore links on Twitter.com to original URLs.
 
 Usage: `:tco`.
 
-# retinafy
+## retinafy
 
 In image preview page, change image to retina-friendly size.
 
