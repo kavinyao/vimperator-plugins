@@ -22,6 +22,47 @@ annotate:
     // Shamelessly copied from highlight.js
     // https://github.com/kavinyao/highlight.js
     var slice = Array.prototype.slice;
+    var DEFAULT_COLOR = '#fae983';
+    var gcolor;
+
+    /**
+     * Find lowest common ancestor.
+     * complexity: O(height(node1)+height(node2))
+     */
+    function find_lca(doc, node1, node2) {
+        var height1 = 1, height2 = 1, diff;
+        var n1 = node1, n2 = node2;
+
+        // get heights of two nodes
+        while(n1.parentNode != doc.body) {
+            height1++;
+            n1 = n1.parentNode;
+        }
+
+        while(n2.parentNode != doc.body) {
+            height2++;
+            n2 = n2.parentNode;
+        }
+
+        // advance the "higher" node by difference
+        // node1 will always be the higher one
+        diff = height1 - height2;
+        if(diff < 0) {
+            diff = -diff;
+            n1 = node1;
+            node1 = node2;
+            node2 = n1;
+        }
+        while(diff-- > 0) node1 = node1.parentNode;
+
+        // advance both nodes simultaneously
+        while(node1.parentNode != node2.parentNode) {
+            node1 = node1.parentNode;
+            node2 = node2.parentNode;
+        }
+
+        return node1.parentNode;
+    }
 
     /**
      * Create <span> node which highlights text.
@@ -29,7 +70,7 @@ annotate:
     function create_highlight_span(doc) {
         var span = doc.createElement('span');
         //TODO: refactor to style
-        span.setAttribute('style', 'background:#fae983;');
+        span.setAttribute('style', 'background:' + gcolor + ';');
         return span;
     }
 
@@ -91,7 +132,7 @@ annotate:
         }
     }
 
-    function highlight_selection(doc) {
+    function highlight_selection(doc, color) {
         var sel = doc.getSelection();
 
         // only support highlight within TextNode
@@ -100,29 +141,48 @@ annotate:
             return;
         }
 
-        if (sel.anchorNode === sel.focusNode) {
-            console.info('Single node mode');
-            var text_node = sel.anchorNode;
-            var full_text = text_node.data;
-            // use min/max to handle backward selection
-            var selected = full_text.slice(
-                Math.min(sel.anchorOffset, sel.focusOffset),
-                Math.max(sel.anchorOffset, sel.focusOffset)
-            );
-            var sides = full_text.split(selected);
+        // set color
+        if(! color)
+            color = DEFAULT_COLOR;
+        gcolor = color;
 
-            // replace original with annotated nodes
-            text_node.data = sides[0];
-            var span = create_highlight_span(doc);
-            span.appendChild(doc.createTextNode(selected));
-            text_node.parentNode.insertBefore(span, text_node.nextSibling);
-            text_node.parentNode.insertBefore(doc.createTextNode(sides[1]), span.nextSibling);
+        if(sel.anchorNode === sel.focusNode) {
+            if(sel.anchorNode.nodeType === sel.anchorNode.TEXT_NODE) {
+                console.info('Single text node mode');
+                var text_node = sel.anchorNode;
+                var full_text = text_node.data;
+                // use min/max to handle backward selection
+                var left = Math.min(sel.anchorOffset, sel.focusOffset);
+                var right = Math.max(sel.anchorOffset, sel.focusOffset);
+
+                // replace original with annotated nodes
+                text_node.data = full_text.substring(0, left);
+                var span = create_highlight_span(doc);
+                span.appendChild(doc.createTextNode(full_text.substring(left, right)));
+                text_node.parentNode.insertBefore(span, text_node.nextSibling);
+                text_node.parentNode.insertBefore(doc.createTextNode(full_text.substring(right)), span.nextSibling);
+            } else if(sel.anchorNode.nodeType === sel.anchorNode.ELEMENT_NODE) {
+                console.info('Single element node mode');
+                // an element is selected (e.g. by triple clicking in firefox)
+                // should mark all TextNode
+                // trick: always in range and never terminate => mark all
+                var mark_all_config = {
+                    doc: doc,
+                    start: null,
+                    start_offset: 0,
+                    end: null,
+                    end_offset: 0,
+                    in_range: true,
+                    terminate: false
+                };
+
+                dfs_mark(sel.anchorNode, mark_all_config);
+            }
         } else {
             console.info('Cross node mode');
             // find lowest common ancestor
-            var traverse_root = sel.anchorNode.parentNode;
-            while(!traverse_root.contains(sel.focusNode))
-                traverse_root = traverse_root.parentNode;
+            // so that we traverse fewest nodes necessary when marking
+            var traverse_root = find_lca(doc, sel.anchorNode, sel.focusNode);
 
             // determine which is first in DFS
             // using TreeWalker said to be fast: http://stackoverflow.com/q/2579666/1240620
@@ -156,10 +216,21 @@ annotate:
         sel.collapseToStart();
     }
 
-    commands.addUserCommand(["anno[tate]"], "annotate by highlighting text on the web page",
+    var builtin_colors = {
+        y: '#fae983',
+        g: '#cbf189',
+        b: '#adc9f6',
+        p: '#f6c4dd',
+        pp: '#e4c8f3'
+    };
+
+    commands.addUserCommand(["a[nnotate]"], "annotate by highlighting text on the web page",
         function(args){
             var doc = gBrowser.selectedBrowser.contentDocument;
-            highlight_selection(doc);
+            var c = args[0];
+            if(c in builtin_colors)
+                c = builtin_colors[c];
+            highlight_selection(doc, c);
         },
         {
             bang: true,
