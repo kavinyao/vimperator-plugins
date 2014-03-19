@@ -19,13 +19,24 @@ modernize:
 //}}}
 
 (function() {
+    var solarizedStyles = 'body {background-color:#003945;color:#FFFFFF;} h1,h2,h3,h4 {color: #AEBF45;} a,a:link {color:#FD6957 !important;}';
+
     commands.addUserCommand(["modern[ize]"], "make plain old webpage look modern",
         function(args){
-            var body = gBrowser.selectedBrowser.contentDocument.body;
+            var document = gBrowser.selectedBrowser.contentDocument;
+            var body = document.body;
             body.style.fontFamily = '"Avenir Next", Avenir, Helvetica Neue';
             body.style.fontSize = '18px';
             body.style.width = '800px';
             body.style.marginLeft = body.style.marginRight = 'auto';
+
+            if (args[0] === '-s') {
+                // get solarized
+                var style = document.createElement('style');
+                style.type = 'text/css';
+                style.appendChild(document.createTextNode(solarizedStyles));
+                document.head.appendChild(style);
+            }
         },
         {
             bang: true,
